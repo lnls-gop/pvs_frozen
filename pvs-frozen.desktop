@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Name=PVS Frozen
+Exec=/home/sirius/shared/gop-services/pvs-frozen/pvs_frozen.py
+Icon=/home/sirius/shared/gop-services/pvs-frozen/pvs-frozen.png
+Terminal=false
+Type=Application
+
+
