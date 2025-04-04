@@ -171,7 +171,7 @@ class MonitorThread(QThread):
         self.pv_monitors[pvname] = epics.camonitor(pvname, callback=callback)
 
     def check_pv_frozen(self, pvname):
-        """Verifica se a PV está congelada com base no histórico de valores."""
+        """Verifica se a PV está congelada comparando diretamente 15 primeiros e 15 últimos valores."""
         if pvname not in self.pv_values:
             return False  # PV não monitorada ou sem histórico
 
@@ -189,13 +189,33 @@ class MonitorThread(QThread):
         if values[-1] is None:
             return False
 
-        # Verifica se o valor mudou durante o período de verificação
-        first_value = values[0]
-        last_value = values[-1]
-        if first_value == last_value:
-            return True  # Valor não mudou, PV congelada
+        # Obtém os primeiros e últimos 15 valores (ou menos se não houver suficientes)
+        num_samples = min(15, len(values))  # Garante que não ultrapasse o número de valores disponíveis
+        first_values = values[:num_samples]
+        last_values = values[-num_samples:] if len(values) >= num_samples else values
 
-        return False  # Valor mudou, PV não congelada
+        # Verifica se temos dados suficientes
+        if len(first_values) < 1 or len(last_values) < 1:
+            return False
+
+        # Verifica se todos os valores são idênticos nos dois conjuntos
+        # Primeiro verifica se todos os primeiros valores são iguais ao primeiro
+        all_first_equal = all(v == first_values[0] for v in first_values)
+
+        # Depois verifica se todos os últimos valores são iguais ao último
+        all_last_equal = all(v == last_values[0] for v in last_values)
+
+        # Finalmente verifica se o primeiro e último valor são iguais
+        first_last_equal = first_values[0] == last_values[0]
+
+        # Considera congelada apenas se:
+        # 1. Todos os primeiros valores são iguais entre si E
+        # 2. Todos os últimos valores são iguais entre si E
+        # 3. O primeiro valor é igual ao último valor
+        if all_first_equal and all_last_equal and first_last_equal:
+            return True  # PV congelada
+
+        return False  # PV não congelada
     
     def check_pv_connected(self, pvname):
         """Verifica se a PV está conectada."""
@@ -239,6 +259,7 @@ class MonitorThread(QThread):
 
 
 class MainWindow(QWidget):
+    """."""
     def __init__(self):
         super(MainWindow, self).__init__()
         self.monitor_thread = None
@@ -264,7 +285,8 @@ class MainWindow(QWidget):
 
         self.interval_input = QSpinBox(self)
         self.interval_input.setRange(1, 3600)
-        self.interval_input.setValue(10)
+        self.interval_input.setValue(1)
+        self.interval_input.setEnabled(False)
         layout.addWidget(self.interval_input)
 
         self.frozen_duration_label = QLabel("Duração para PV congelada (minutos):", self)
@@ -273,19 +295,20 @@ class MainWindow(QWidget):
         self.frozen_duration_input = QSpinBox(self)
         self.frozen_duration_input.setRange(1, 60)
         self.frozen_duration_input.setValue(5)
+        self.frozen_duration_input.setEnabled(False)
         layout.addWidget(self.frozen_duration_input)
 
-        self.list_pv_button = QPushButton('Listar PVs', self)
-        self.list_pv_button.clicked.connect(self.start_monitor_thread)
-        layout.addWidget(self.list_pv_button)
-
-        self.stop_button = QPushButton('Stop', self)
+        self.stop_button = QPushButton('1 - Stop', self)
         self.stop_button.clicked.connect(self.stop_monitor)
         layout.addWidget(self.stop_button)
 
-        self.clear_button = QPushButton('Clear Log', self)
+        self.clear_button = QPushButton('2 - Clear Log', self)
         self.clear_button.clicked.connect(self.clear_monitor)
         layout.addWidget(self.clear_button)
+
+        self.list_pv_button = QPushButton('3 - Listar PVs', self)
+        self.list_pv_button.clicked.connect(self.start_monitor_thread)
+        layout.addWidget(self.list_pv_button)
 
         self.progress_bar = QProgressBar(self)
         self.progress_bar.setRange(0, 100)
@@ -364,6 +387,7 @@ class MainWindow(QWidget):
         self.status_output.clear()
         self.pv_output.clear()
         self.frozen_pv_output.clear()
+        self.disconnected_pv_output.clear()
         self.status_label.setText("Status: Ocioso")
         self.progress_bar.setValue(0)
 
