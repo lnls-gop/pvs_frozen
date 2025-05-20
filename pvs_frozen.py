@@ -177,6 +177,7 @@ class MonitorThread(QThread):
 
         values = self.pv_values[pvname].get("values", [])
         timestamps = self.pv_values[pvname].get("timestamps", [])
+        time.sleep(4)
 
         if not values or not timestamps:
             return False  # Sem dados para verificar
@@ -189,8 +190,8 @@ class MonitorThread(QThread):
         if values[-1] is None:
             return False
 
-        # Obtém os primeiros e últimos 15 valores (ou menos se não houver suficientes)
-        num_samples = min(15, len(values))  # Garante que não ultrapasse o número de valores disponíveis
+        # Obtém os primeiros e últimos  valores (ou menos se não houver suficientes)
+        num_samples = min(60, len(values))  # Garante que não ultrapasse o número de valores disponíveis
         first_values = values[:num_samples]
         last_values = values[-num_samples:] if len(values) >= num_samples else values
 
@@ -216,6 +217,7 @@ class MonitorThread(QThread):
             return True  # PV congelada
 
         return False  # PV não congelada
+    
     
     def check_pv_connected(self, pvname):
         """Verifica se a PV está conectada."""
